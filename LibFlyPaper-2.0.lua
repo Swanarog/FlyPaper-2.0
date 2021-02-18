@@ -525,12 +525,29 @@ function FlyPaper.GetBestAnchorForParentGrid(frame, xScale, yScale, tolerance, x
         end
     end
 
+	if bestDistance == math.huge then
+		--if no vertex on grid was found, try snapping to lines on grid
+		-- iterate through all frame points
+		for _, point in ipairs(POINTS) do
+			local relPoint, x, y, distance = FlyPaper.GetBestAnchorToGridLineForParentGrid(frame, point, xScale, yScale, tolerance, xOff, yOff)
+
+			-- keep it if its better
+			if distance and distance < bestDistance then
+				bestDistance = distance
+				bestPoint = point
+				bestRelPoint = relPoint
+				bestX = x
+				bestY = y
+			end
+		end
+	end
+	
     if bestDistance <= tolerance then
         return bestPoint, bestRelPoint, bestX, bestY, bestDistance
     end
 end
 
-unction FlyPaper.GetBestAnchorToPointForParentGrid(frame, point, xScale, yScale, tolerance, xOff, yOff)
+function FlyPaper.GetBestAnchorToPointForParentGrid(frame, point, xScale, yScale, tolerance, xOff, yOff)
 	--due to changes in Dominos_Config\overlay\ui.lua to
 	--function "DrawGrid", grid snapping must now be based off screen center.
 	if not frame then
@@ -561,6 +578,49 @@ unction FlyPaper.GetBestAnchorToPointForParentGrid(frame, point, xScale, yScale,
 		local scale = frame:GetScale()
 
 		return 'BOTTOMLEFT', x / scale, y / scale, distance
+	end
+end
+
+function FlyPaper.GetBestAnchorToGridLineForParentGrid(frame, point, xScale, yScale, tolerance, xOff, yOff)
+	--due to changes in Dominos_Config\overlay\ui.lua to
+	--function "DrawGrid", grid snapping must now be based off screen center.
+	if not frame then
+		return
+	end
+
+	local parent = frame:GetParent()
+	if not parent then
+		return
+	end
+
+	xScale = tonumber(xScale) or 1
+    yScale = tonumber(yScale) or 1
+    tolerance = tonumber(tolerance) or math.huge
+	xOff = tonumber(xOff) or 0
+	yOff = tonumber(yOff) or 0
+
+	-- get the coordinates for the frame point
+	local fx, fy = COORDS[point](GetRelativeRect(frame, parent, xOff, yOff))
+	local cX, cY = parent:GetWidth()/2, parent:GetHeight()/2
+
+	local x = (GetNearestMultiple(fx - cX, xScale)) + cX --nearest vertex, based off screen center.
+	local y = (GetNearestMultiple(fy - cY, yScale)) + cY
+
+	local scale = frame:GetScale()
+		
+	local hdist = GetDistance(fx, y, x, y)
+	local vDist = GetDistance(x, fy, x, y)
+
+	local a = (hdist <= tolerance) and x
+	local b = (vDist <= tolerance) and y
+	
+	local distance = (a and b) and GetDistance(fx, fy, x, y)
+					or a and hdist
+					or b and vDist
+					or nil
+
+	if distance then
+		return 'BOTTOMLEFT', (a or fx) / scale, (b or fy) / scale, distance
 	end
 end
 
